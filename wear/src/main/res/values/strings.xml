@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pip</string>
+    <string name="hold_label">HOLD</string>
+    <string name="recording">Recording</string>
+    <string name="queue_full">Queue full</string>
+    <string name="status_sent">Sent</string>
+    <string name="status_queued">Queued</string>
+    <string name="tile_label">Pip</string>
+
+    <string name="fg_channel_name">Recording</string>
+    <string name="fg_channel_desc">Active voice recordings</string>
+    <string name="fg_notification_title">Recording…</string>
+    <string name="fg_notification_text">Hold to capture a note</string>
+</resources>
