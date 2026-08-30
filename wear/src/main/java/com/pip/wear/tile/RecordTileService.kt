@@ -1,12 +1,14 @@
 package com.pip.wear.tile
 
-import android.app.PendingIntent
-import android.content.Intent
 import androidx.wear.tiles.ActionBuilders
 import androidx.wear.tiles.LayoutElementBuilders
+import androidx.wear.tiles.ModifiersBuilders
+import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import androidx.wear.tiles.TimelineBuilders
+import androidx.concurrent.futures.CallbackToFutureAdapter
+import com.google.common.util.concurrent.ListenableFuture
 import com.pip.wear.R
 import com.pip.wear.ui.recording.RecordingActivity
 
@@ -16,44 +18,50 @@ import com.pip.wear.ui.recording.RecordingActivity
  */
 class RecordTileService : TileService() {
 
-    override suspend fun onTileRequest(requestParams: TileService.TileRequest): TileBuilders.Tile {
-        val launchIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, RecordingActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val buttonClick = ActionBuilders.LaunchAction.Builder().setAndroidActivity(launchIntent).build()
-
-        val button = LayoutElementBuilders.Button.Builder()
-            .setText(
-                LayoutElementBuilders.Text.Builder()
-                    .setText(getString(R.string.hold_label))
+    override fun onTileRequest(
+        requestParams: RequestBuilders.TileRequest
+    ): ListenableFuture<TileBuilders.Tile> {
+        val launchAction: ActionBuilders.Action = ActionBuilders.LaunchAction.Builder()
+            .setAndroidActivity(
+                ActionBuilders.AndroidActivity.Builder()
+                    .setPackageName(packageName)
+                    .setClassName(RecordingActivity::class.java.name)
                     .build()
             )
-            .setContentDescription(getString(R.string.hold_label))
-            .setOnClick(ActionBuilders.Action.Builder().setLaunchAction(buttonClick).build())
             .build()
 
-        val label = LayoutElementBuilders.Text.Builder()
-            .setText(getString(R.string.tile_label))
+        val clickable = ModifiersBuilders.Clickable.Builder()
+            .setId("open_recording")
+            .setOnClick(launchAction)
             .build()
 
         val root = LayoutElementBuilders.Column.Builder()
-            .addContent(label)
-            .addContent(button)
+            .addContent(
+                LayoutElementBuilders.Text.Builder()
+                    .setText(getString(R.string.tile_label))
+                    .build()
+            )
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder().setClickable(clickable).build()
+            )
             .build()
 
-        val progress = TimelineBuilders.TimelineEntry.Builder()
+        val timelineEntry = TimelineBuilders.TimelineEntry.Builder()
             .setLayout(
                 LayoutElementBuilders.Layout.Builder().setRoot(root).build()
             )
             .build()
 
-        return TileBuilders.Tile.Builder()
+        val tile = TileBuilders.Tile.Builder()
             .setResourcesVersion("1")
-            .setTimeline(TimelineBuilders.Timeline.Builder().addTimelineEntry(progress).build())
+            .setTimeline(
+                TimelineBuilders.Timeline.Builder().addTimelineEntry(timelineEntry).build()
+            )
             .build()
+
+        return CallbackToFutureAdapter.getFuture { completer ->
+            completer.set(tile)
+            "open_recording"
+        }
     }
 }

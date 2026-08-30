@@ -50,9 +50,15 @@ class WavRecorder(private val outputFile: File) : Closeable {
         val out = BufferedOutputStream(FileOutputStream(outputFile))
         writeWaveHeader(out, 0L)
 
-        val started = record.startRecording()
-        if (started != AudioRecord.SUCCESS) {
-            out.close()
+        try {
+            record.startRecording()
+        } catch (t: Throwable) {
+            runCatching { out.close() }
+            record.release()
+            return false
+        }
+        if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+            runCatching { out.close() }
             record.release()
             return false
         }
@@ -151,15 +157,15 @@ class WavRecorder(private val outputFile: File) : Closeable {
     }
 
     private fun writeIntLittleEndian(raf: RandomAccessFile, value: Int) {
-        raf.write((value and 0xFF).toByte())
-        raf.write(((value shr 8) and 0xFF).toByte())
-        raf.write(((value shr 16) and 0xFF).toByte())
-        raf.write(((value shr 24) and 0xFF).toByte())
+        raf.write(value and 0xFF)
+        raf.write((value shr 8) and 0xFF)
+        raf.write((value shr 16) and 0xFF)
+        raf.write((value shr 24) and 0xFF)
     }
 
     private fun writeShortLittleEndian(raf: RandomAccessFile, value: Int) {
-        raf.write((value and 0xFF).toByte())
-        raf.write(((value shr 8) and 0xFF).toByte())
+        raf.write(value and 0xFF)
+        raf.write((value shr 8) and 0xFF)
     }
 
     private fun writeIntLittleEndian(bytes: ByteArray, offset: Int, value: Int) {

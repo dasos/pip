@@ -13,7 +13,7 @@ import com.pip.phone.data.NoteEntity
 import com.pip.phone.data.NoteQueueManager
 import com.pip.phone.data.NoteStatus
 import com.pip.phone.data.PipDatabase
-import com.pip.phone.worker.TranscribeWorker
+import com.pip.phone.worker.AudioUploadWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,7 +50,6 @@ class WearListenerService : WearableListenerService() {
         }
 
         val note = NoteEntity(
-            text = "",
             createdAt = timestamp,
             status = NoteStatus.PENDING,
             audioPath = file.absolutePath,
@@ -58,21 +57,20 @@ class WearListenerService : WearableListenerService() {
         PipDatabase.get(this).noteDao().insert(note)
         queue.enforcePolicies(PipDatabase.get(this).noteDao())
 
-        // Kick off transcription immediately.
-        TranscribeWorker.enqueue(this)
+        // Kick off upload immediately.
+        AudioUploadWorker.enqueue(this)
 
         // Ack back to the watch so it can clear its queue entry.
         ackToWatch(listOf(id))
     }
 
     private suspend fun downloadAsset(asset: Asset, target: File): Boolean = try {
-        val bytes = Wearable.getDataClient(this).getFdForAsset(asset).await()
-        bytes.assetFd?.let { fd ->
-            fd.createInputStream().use { input ->
-                FileOutputStream(target).use { output -> input.copyTo(output) }
-            }
-            return true
-        } ?: false
+        val response = Wearable.getDataClient(this).getFdForAsset(asset).await()
+        response.inputStream.use { input ->
+            FileOutputStream(target).use { output -> input.copyTo(output) }
+        }
+        response.release()
+        true
     } catch (t: Throwable) {
         Log.w(TAG, "Asset download failed", t)
         false

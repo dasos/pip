@@ -40,13 +40,14 @@
 
         <service
             android:name=".tile.RecordTileService"
+            android:label="@string/tile_label"
             android:exported="true"
-            android:permission="android.permission.BIND_TILE_SERVICE">
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
-                <action android:name="android.service.tiles.TileService" />
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
             </intent-filter>
             <meta-data
-                android:name="android.app.tile.preview"
+                android:name="androidx.wear.tiles.PREVIEW"
                 android:resource="@drawable/tile_preview" />
         </service>
 

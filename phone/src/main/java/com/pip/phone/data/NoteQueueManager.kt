@@ -27,7 +27,7 @@ class NoteQueueManager(private val context: Context) {
         audioDir.listFiles().orEmpty()
             .filter { it.lastModified() < cutoff }
             .forEach { it.delete() }
-        // Drop notes whose audio is gone and never transcribed (abandoned).
+        // Drop notes whose audio is gone and never uploaded (abandoned).
         dao.byStatus(NoteStatus.PENDING).forEach { note ->
             val path = note.audioPath
             if (path != null && !File(path).exists()) {

@@ -14,13 +14,10 @@
     <string name="connection_ok">Connected</string>
     <string name="connection_failed">Connection failed</string>
     <string name="empty_notes">No notes yet</string>
-    <string name="status_transcribed">Transcribed</string>
     <string name="status_uploaded">Uploaded</string>
     <string name="status_failed">Failed</string>
     <string name="status_pending">Pending</string>
+    <string name="play_pause">Play or pause recording</string>
+    <string name="play_recording">Play recording</string>
     <string name="open_settings">Settings</string>
-    <string name="fg_transcribe_title">Transcribing…</string>
-    <string name="fg_transcribe_text">Transcribing a note from your watch</string>
-    <string name="fg_channel_name">Transcription</string>
-    <string name="fg_channel_desc">Active transcriptions</string>
 </resources>

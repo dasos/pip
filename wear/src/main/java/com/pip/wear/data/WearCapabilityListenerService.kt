@@ -6,8 +6,15 @@ import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.WearableListenerService
 import com.pip.wear.audio.AudioQueueManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class WearCapabilityListenerService : WearableListenerService() {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         for (event in dataEvents) {
@@ -29,12 +36,19 @@ class WearCapabilityListenerService : WearableListenerService() {
     private fun onConfig(dataMap: com.google.android.gms.wearable.DataMap) {
         val serverUrl = dataMap.getString(WearPaths.KEY_SERVER_URL) ?: return
         val token = dataMap.getString(WearPaths.KEY_BEARER_TOKEN) ?: return
-        WatchConfigStore(applicationContext).update(serverUrl, token)
+        scope.launch {
+            WatchConfigStore(applicationContext).update(serverUrl, token)
+        }
     }
 
     private fun onAck(dataMap: com.google.android.gms.wearable.DataMap) {
         val ids = dataMap.getStringArrayList(WearPaths.KEY_ACK_IDS) ?: return
         AudioQueueManager(applicationContext).clearSent(ids)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
     }
 
     companion object {

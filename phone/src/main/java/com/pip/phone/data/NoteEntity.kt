@@ -6,7 +6,6 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "notes")
 data class NoteEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val text: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val status: NoteStatus = NoteStatus.PENDING,
     val audioPath: String? = null,
@@ -14,7 +13,6 @@ data class NoteEntity(
 
 enum class NoteStatus {
     PENDING,
-    TRANSCRIBED,
     UPLOADED,
     FAILED,
 }

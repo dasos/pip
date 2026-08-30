@@ -122,7 +122,7 @@ class RecordingService : Service() {
             } catch (t: Throwable) {
                 WearSendClient.SendResult.QUEUED
             }
-            statusFlow.value = when (result) {
+            _statusFlow.value = when (result) {
                 WearSendClient.SendResult.SENT -> DeliveryStatus.Sent
                 else -> DeliveryStatus.Queued
             }

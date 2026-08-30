@@ -45,8 +45,8 @@ android {
     }
 
     lint {
-        warning("MissingApplicationIcon")
-        warning("NotificationIcon")
+        warning += "MissingApplicationIcon"
+        warning += "NotificationIcon"
     }
 }
 
@@ -75,7 +75,5 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.okhttp)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.mlkit.speech)
     implementation(libs.security.crypto)
 }

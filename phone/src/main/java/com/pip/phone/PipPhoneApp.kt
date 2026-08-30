@@ -7,8 +7,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.pip.phone.worker.PhoneWorkerBuilder
-import com.pip.phone.worker.TranscribeWorker
-import com.pip.phone.worker.UploadWorker
+import com.pip.phone.worker.AudioUploadWorker
 import java.util.concurrent.TimeUnit
 
 class PipPhoneApp : Application() {
@@ -24,19 +23,10 @@ class PipPhoneApp : Application() {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        val transcribe = PeriodicWorkRequestBuilder<TranscribeWorker>(
-            PhoneWorkerBuilder.TRANSCRIBE_PERIOD_MINUTES, TimeUnit.MINUTES
-        ).setConstraints(networkConstraint).build()
-
-        val upload = PeriodicWorkRequestBuilder<UploadWorker>(
+        val upload = PeriodicWorkRequestBuilder<AudioUploadWorker>(
             PhoneWorkerBuilder.UPLOAD_PERIOD_MINUTES, TimeUnit.MINUTES
         ).setConstraints(networkConstraint).build()
 
-        wm.enqueueUniquePeriodicWork(
-            PhoneWorkerBuilder.TRANSCRIBE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            transcribe
-        )
         wm.enqueueUniquePeriodicWork(
             PhoneWorkerBuilder.UPLOAD_WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,

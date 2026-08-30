@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [NoteEntity::class], version = 1, exportSchema = false)
+@Database(entities = [NoteEntity::class], version = 2, exportSchema = false)
 abstract class PipDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 
@@ -19,7 +19,10 @@ abstract class PipDatabase : RoomDatabase() {
                     context.applicationContext,
                     PipDatabase::class.java,
                     "pip.db"
-                ).build().also { instance = it }
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { instance = it }
             }
     }
 }

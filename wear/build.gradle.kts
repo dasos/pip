@@ -46,8 +46,8 @@ android {
     }
 
     lint {
-        warning("MissingApplicationIcon")
-        warning("NotificationIcon")
+        warning += "MissingApplicationIcon"
+        warning += "NotificationIcon"
     }
 }
 
@@ -68,7 +68,6 @@ dependencies {
     implementation(libs.wear.compose.material)
     implementation(libs.wear.compose.foundation)
     implementation(libs.wear.compose.navigation)
-    implementation(libs.wear.compose.ui)
 
     implementation(libs.wear.tiles)
     implementation(libs.wear.tiles.material)
@@ -76,4 +75,5 @@ dependencies {
 
     implementation(libs.work.runtime)
     implementation(libs.datastore.prefs)
+    implementation(libs.concurrent.futures)
 }

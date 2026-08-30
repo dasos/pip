@@ -1,6 +1,3 @@
-# Keep ML Kit model downloader / protobuf produced classes
--keep class com.google.mlkit.** { *; }
-
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**

@@ -53,10 +53,6 @@ fun RecordingScreen() {
     var tick by remember { mutableLongStateOf(0L) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) startCapture() }
-
     fun startCapture() {
         if (isRecording) return
         val output = AudioQueueManager(context).newRecordingFile()
@@ -64,6 +60,10 @@ fun RecordingScreen() {
         startedAt = System.currentTimeMillis()
         isRecording = true
     }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) startCapture() }
 
     fun requestOrStart() {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
