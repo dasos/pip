@@ -42,23 +42,28 @@ jobs:
           fi
       - name: Assemble debug APKs
         run: gradle :phone:assembleDebug :wear:assembleDebug --no-daemon --stacktrace
+      - name: Prepare APKs for release and artifacts
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' phone/build.gradle.kts)
+          cp phone/build/outputs/apk/debug/*.apk "phone/build/outputs/apk/debug/pip-v${VERSION}.apk"
+          cp wear/build/outputs/apk/debug/*.apk "wear/build/outputs/apk/debug/pip-wear-v${VERSION}.apk"
       - name: Upload debug phone APK
         uses: actions/upload-artifact@v7
         with:
           name: pip-phone-debug-apk
-          path: phone/build/outputs/apk/debug/*.apk
+          path: phone/build/outputs/apk/debug/pip-v*.apk
           if-no-files-found: ignore
       - name: Upload debug wear APK
         uses: actions/upload-artifact@v7
         with:
           name: pip-wear-debug-apk
-          path: wear/build/outputs/apk/debug/*.apk
+          path: wear/build/outputs/apk/debug/pip-wear-v*.apk
           if-no-files-found: ignore
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            phone/build/outputs/apk/debug/*.apk
-            wear/build/outputs/apk/debug/*.apk
+            phone/build/outputs/apk/debug/pip-v*.apk
+            wear/build/outputs/apk/debug/pip-wear-v*.apk
           generate_release_notes: true
