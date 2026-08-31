@@ -86,9 +86,11 @@ class RecordingService : Service() {
     private fun beginRecording(output: String?) {
         val queue = AudioQueueManager(this)
         val file = output?.let(::File)?.takeIf { !it.exists() } ?: queue.newRecordingFile()
+        android.util.Log.d(TAG, "beginRecording: target file=${file.absolutePath}")
 
         val rec = WavRecorder(file)
         if (!rec.start()) {
+            android.util.Log.e(TAG, "beginRecording: WavRecorder failed to start")
             stopSelfResult()
             return
         }
@@ -96,6 +98,7 @@ class RecordingService : Service() {
         outputFile = file
         recordingActive = true
         performCaptureHaptic()
+        android.util.Log.i(TAG, "beginRecording: Recording started successfully")
     }
 
     /**
@@ -103,25 +106,36 @@ class RecordingService : Service() {
      * Invoked by the UI (or [ACTION_STOP]) when the button is released.
      */
     fun stopAndProcess() {
-        val rec = recorder ?: run { stopSelfResult(); return }
+        android.util.Log.d(TAG, "stopAndProcess invoked (recordingActive=$recordingActive)")
+        val rec = recorder ?: run {
+            android.util.Log.w(TAG, "stopAndProcess: recorder is null")
+            stopSelfResult()
+            return
+        }
         if (!recordingActive) return
         recordingActive = false
         performCaptureHaptic()
         rec.close()
         recorder = null
 
-        val file = outputFile ?: return
+        val file = outputFile ?: run {
+            android.util.Log.w(TAG, "stopAndProcess: outputFile is null")
+            return
+        }
         outputFile = null
 
         scope.launch {
             val queue = AudioQueueManager(this@RecordingService)
             val entry = queue.enqueue(file, rec.startedAt)
+            android.util.Log.d(TAG, "stopAndProcess: Enqueued recording id=${entry.id}, size=${entry.file.length()} bytes. Attempting push to phone...")
 
             val result = try {
                 WearSendClient(applicationContext as Application).push(entry)
             } catch (t: Throwable) {
+                android.util.Log.e(TAG, "stopAndProcess: Exception during push", t)
                 WearSendClient.SendResult.QUEUED
             }
+            android.util.Log.i(TAG, "stopAndProcess: Push result = $result")
             _statusFlow.value = when (result) {
                 WearSendClient.SendResult.SENT -> DeliveryStatus.Sent
                 else -> DeliveryStatus.Queued
