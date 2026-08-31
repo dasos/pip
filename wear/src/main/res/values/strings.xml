@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pip</string>
-    <string name="hold_label">HOLD</string>
-    <string name="recording">Recording</string>
-    <string name="queue_full">Queue full</string>
+    <string name="hold_to_record">Hold to record</string>
+    <string name="sending">Sending…</string>
     <string name="status_sent">Sent</string>
     <string name="status_queued">Queued</string>
+    <string name="recording">Recording</string>
+    <string name="queue_full">Queue full</string>
     <string name="tile_label">Pip</string>
 
     <string name="fg_channel_name">Recording</string>

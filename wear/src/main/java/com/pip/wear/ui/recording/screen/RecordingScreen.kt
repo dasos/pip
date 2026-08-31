@@ -11,9 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,8 +32,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -45,20 +45,27 @@ import com.pip.wear.recording.DeliveryStatus
 import com.pip.wear.recording.RecordingService
 import kotlinx.coroutines.delay
 
+private enum class UiState {
+    IDLE,
+    RECORDING,
+    SENDING,
+    RESULT
+}
+
 @Composable
 fun RecordingScreen() {
     val context = LocalContext.current
-    var isRecording by remember { mutableStateOf(false) }
+    var uiState by remember { mutableStateOf(UiState.IDLE) }
     var startedAt by remember { mutableLongStateOf(0L) }
     var tick by remember { mutableLongStateOf(0L) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var resultText by remember { mutableStateOf<String?>(null) }
 
     fun startCapture() {
-        if (isRecording) return
+        if (uiState == UiState.RECORDING) return
         val output = AudioQueueManager(context).newRecordingFile()
         RecordingService.postStart(context, output)
         startedAt = System.currentTimeMillis()
-        isRecording = true
+        uiState = UiState.RECORDING
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -66,29 +73,31 @@ fun RecordingScreen() {
     ) { granted -> if (granted) startCapture() }
 
     fun requestOrStart() {
+        if (uiState != UiState.IDLE && uiState != UiState.RESULT) return
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) startCapture() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    // Observe one-shot delivery status.
+    // Observe delivery status
     LaunchedEffect(Unit) {
         RecordingService.statusFlow.collect { status ->
-            statusMessage = when (status) {
-                DeliveryStatus.Sent -> context.getString(R.string.status_sent)
-                DeliveryStatus.Queued -> context.getString(R.string.status_queued)
-                else -> null
-            }
-            if (status != null) {
+            if (status != null && uiState == UiState.SENDING) {
+                resultText = when (status) {
+                    DeliveryStatus.Sent -> context.getString(R.string.status_sent)
+                    DeliveryStatus.Queued -> context.getString(R.string.status_queued)
+                }
+                uiState = UiState.RESULT
                 delay(2000)
-                statusMessage = null
+                resultText = null
+                uiState = UiState.IDLE
             }
         }
     }
 
-    // Elapsed timer while recording.
-    LaunchedEffect(isRecording) {
-        while (isRecording) {
+    // Elapsed timer while recording
+    LaunchedEffect(uiState) {
+        while (uiState == UiState.RECORDING) {
             delay(500)
             tick++
         }
@@ -100,59 +109,62 @@ fun RecordingScreen() {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            if (isRecording) {
-                RecordingIndicator(startedAt, tick)
-            }
-            HoldButton(
-                recording = isRecording,
-                onPress = { requestOrStart() },
-                onRelease = {
-                    isRecording = false
+        RecordCircle(
+            uiState = uiState,
+            startedAt = startedAt,
+            resultText = resultText,
+            onPress = { requestOrStart() },
+            onRelease = {
+                if (uiState == UiState.RECORDING) {
+                    uiState = UiState.SENDING
                     RecordingService.postStop(context)
-                },
-            )
-            statusMessage?.let { msg ->
-                Text(
-                    text = msg,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(16.dp)
-                )
+                }
             }
-        }
+        )
     }
 }
 
 @Composable
-private fun HoldButton(
-    recording: Boolean,
+private fun RecordCircle(
+    uiState: UiState,
+    startedAt: Long,
+    resultText: String?,
     onPress: () -> Unit,
     onRelease: () -> Unit,
 ) {
+    // Pulse animation: only pulse when listening (RECORDING) or sending (SENDING)
+    val shouldPulse = uiState == UiState.RECORDING || uiState == UiState.SENDING
     val transition = rememberInfiniteTransition(label = "pulse")
     val pulse by transition.animateFloat(
         initialValue = 1f,
-        targetValue = if (recording) 1.15f else 1.08f,
+        targetValue = if (uiState == UiState.SENDING) 1.18f else 1.15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = if (recording) 700 else 1100),
+            animation = tween(
+                durationMillis = when (uiState) {
+                    UiState.SENDING -> 400 // faster pulse when sending
+                    UiState.RECORDING -> 700
+                    else -> 1000
+                }
+            ),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseScale"
     )
 
+    val scaleModifier = if (shouldPulse) Modifier.scale(pulse) else Modifier
+
     Surface(
         shape = CircleShape,
-        color = if (recording) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiaryContainer,
+        color = when (uiState) {
+            UiState.RECORDING -> MaterialTheme.colorScheme.primary
+            UiState.SENDING -> MaterialTheme.colorScheme.secondary
+            UiState.RESULT -> MaterialTheme.colorScheme.primary
+            UiState.IDLE -> MaterialTheme.colorScheme.tertiaryContainer
+        },
         modifier = Modifier
             .size(140.dp)
-            .scale(pulse)
-            .pointerInput(Unit) {
+            .then(scaleModifier)
+            .pointerInput(uiState) {
                 detectTapGestures(
                     onPress = {
                         onPress()
@@ -162,27 +174,55 @@ private fun HoldButton(
                 )
             }
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = "HOLD",
-                color = if (recording) Color.White else MaterialTheme.colorScheme.onTertiaryContainer,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            when (uiState) {
+                UiState.IDLE -> {
+                    Text(
+                        text = stringResource(R.string.hold_to_record),
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                UiState.RECORDING -> {
+                    val elapsed = System.currentTimeMillis() - startedAt
+                    val seconds = elapsed / 1000
+                    val minutes = seconds / 60
+                    val secs = seconds % 60
+                    Text(
+                        text = "%d:%02d".format(minutes, secs),
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                UiState.SENDING -> {
+                    Text(
+                        text = stringResource(R.string.sending),
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                UiState.RESULT -> {
+                    Text(
+                        text = resultText ?: "",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
     }
-}
-
-@Composable
-private fun RecordingIndicator(startedAt: Long, tick: Long) {
-    val elapsed = System.currentTimeMillis() - startedAt
-    val seconds = elapsed / 1000
-    val minutes = seconds / 60
-    val secs = seconds % 60
-    Text(
-        text = "%d:%02d".format(minutes, secs),
-        color = Color.White,
-        fontSize = 18.sp,
-        fontFamily = FontFamily.Monospace
-    )
 }
