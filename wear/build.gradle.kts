@@ -92,9 +92,5 @@ dependencies {
 
     implementation(libs.work.runtime)
     implementation(libs.datastore.prefs)
-<<<<<<< HEAD
     implementation(libs.concurrent.futures)
 }
-=======
-}
->>>>>>> e70b385 (Set Pip app icons)
