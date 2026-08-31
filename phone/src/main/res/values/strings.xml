@@ -19,6 +19,7 @@
     <string name="connection_http_error">Server responded HTTP %1$d</string>
     <string name="connection_unreachable">Could not reach server: %1$s</string>
     <string name="empty_notes">No notes yet</string>
+    <string name="watch_not_connected">Watch not connected — recordings won\'t arrive</string>
     <string name="status_uploaded">Uploaded</string>
     <string name="status_failed">Failed</string>
     <string name="status_pending">Pending</string>

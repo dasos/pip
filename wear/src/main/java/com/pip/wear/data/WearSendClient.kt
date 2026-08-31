@@ -42,14 +42,20 @@ class WearSendClient(private val app: Application) {
     }
 
     /** Immediately pushes a single freshly recorded [recording]. */
-    suspend fun push(recording: AudioQueueManager.QueuedRecording): SendResult = try {
-        Log.d(TAG, "push: Starting push for id=${recording.id}, file=${recording.file.name}, size=${recording.file.length()} bytes")
-        sendItem(recording.file, recording.id, recording.capturedAt.toEpochMilli())
-        Log.i(TAG, "push: Successfully sent data item for ${recording.id}")
-        SendResult.SENT
-    } catch (t: Throwable) {
-        Log.w(TAG, "push failed for ${recording.id}: ${t.message}", t)
-        SendResult.QUEUED
+    suspend fun push(recording: AudioQueueManager.QueuedRecording): SendResult {
+        if (nodeClient.connectedNodes.await().isEmpty()) {
+            Log.w(TAG, "push: no phone node connected, keeping ${recording.id} queued locally")
+            return SendResult.PHONE_UNREACHABLE
+        }
+        return try {
+            Log.d(TAG, "push: Starting push for id=${recording.id}, file=${recording.file.name}, size=${recording.file.length()} bytes")
+            sendItem(recording.file, recording.id, recording.capturedAt.toEpochMilli())
+            Log.i(TAG, "push: Successfully sent data item for ${recording.id}")
+            SendResult.SENT
+        } catch (t: Throwable) {
+            Log.w(TAG, "push failed for ${recording.id}: ${t.message}", t)
+            SendResult.QUEUED
+        }
     }
 
     private suspend fun sendItem(file: java.io.File, id: String, timestamp: Long) {

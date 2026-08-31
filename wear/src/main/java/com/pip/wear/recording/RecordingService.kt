@@ -138,6 +138,7 @@ class RecordingService : Service() {
             android.util.Log.i(TAG, "stopAndProcess: Push result = $result")
             _statusFlow.value = when (result) {
                 WearSendClient.SendResult.SENT -> DeliveryStatus.Sent
+                WearSendClient.SendResult.PHONE_UNREACHABLE -> DeliveryStatus.PhoneUnreachable
                 else -> DeliveryStatus.Queued
             }
             stopSelfResult()

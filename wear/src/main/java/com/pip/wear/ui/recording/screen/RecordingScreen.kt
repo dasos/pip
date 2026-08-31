@@ -88,6 +88,7 @@ fun RecordingScreen() {
                 resultText = when (status) {
                     DeliveryStatus.Sent -> context.getString(R.string.status_sent)
                     DeliveryStatus.Queued -> context.getString(R.string.status_queued)
+                    DeliveryStatus.PhoneUnreachable -> context.getString(R.string.status_no_phone)
                 }
                 uiState = UiState.RESULT
             }

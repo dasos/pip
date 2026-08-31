@@ -28,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pip.phone.R
@@ -43,6 +45,7 @@ import com.pip.phone.data.NoteDao
 import com.pip.phone.data.NoteEntity
 import com.pip.phone.data.NoteStatus
 import com.pip.phone.data.PipDatabase
+import com.pip.phone.wear.PhoneWatchLink
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -61,6 +64,8 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
     // The audio file currently being previewed, or null when stopped.
     var previewPath by remember { mutableStateOf<String?>(null) }
 
+    val watchConnected by PhoneWatchLink.watchConnected.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -73,27 +78,37 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
             )
         }
     ) { padding ->
-        if (notes.isEmpty()) {
-            Box(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(context.getString(R.string.empty_notes))
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            if (!watchConnected) {
+                Text(
+                    text = stringResource(R.string.watch_not_connected),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                )
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(notes, key = { it.id }) { note ->
-                    NoteCard(
-                        note = note,
-                        isPlaying = previewPath != null && previewPath == note.audioPath,
-                        onTogglePlay = {
-                            previewPath = if (previewPath == note.audioPath) null else note.audioPath
-                        }
-                    )
+            if (notes.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(stringResource(R.string.empty_notes))
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(notes, key = { it.id }) { note ->
+                        NoteCard(
+                            note = note,
+                            isPlaying = previewPath != null && previewPath == note.audioPath,
+                            onTogglePlay = {
+                                previewPath = if (previewPath == note.audioPath) null else note.audioPath
+                            }
+                        )
+                    }
                 }
             }
         }
