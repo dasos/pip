@@ -4,6 +4,7 @@ import android.content.Context
 import com.pip.phone.config.ServerConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -34,7 +35,8 @@ class AudioUploader(private val context: Context) {
         val config = ServerConfig(context).load()
             ?: return@withContext UploadOutcome.FAILED
 
-        val url = config.serverUrl.trim().trimEnd('/') + "/audio"
+        val url = (config.serverUrl.trim().trimEnd('/') + "/audio").toHttpUrlOrNull()
+            ?: return@withContext UploadOutcome.RETRYABLE
         val iso = DateTimeFormatter.ISO_INSTANT.format(
             Instant.ofEpochMilli(createdAt).atOffset(ZoneOffset.UTC)
         )

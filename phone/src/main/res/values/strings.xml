@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">Pip</string>
     <string name="settings_title">Pip Settings</string>
+    <string name="close_settings">Close</string>
+    <string name="connection_testing">Testing connection…</string>
     <string name="notes_title">Pip Notes</string>
     <string name="server_url_label">Server URL</string>
     <string name="server_url_hint">https://api.example.com</string>
@@ -9,10 +11,13 @@
     <string name="bearer_token_hint">Paste your token</string>
     <string name="save_config">Save</string>
     <string name="test_connection">Test connection</string>
-    <string name="config_saved">Configuration saved</string>
     <string name="config_error">Could not save configuration</string>
     <string name="connection_ok">Connected</string>
-    <string name="connection_failed">Connection failed</string>
+    <string name="connection_invalid_url">Invalid URL — must start with http:// or https://</string>
+    <string name="connection_unauthorized">Unauthorized — check your bearer token</string>
+    <string name="connection_timeout">Connection timed out</string>
+    <string name="connection_http_error">Server responded HTTP %1$d</string>
+    <string name="connection_unreachable">Could not reach server: %1$s</string>
     <string name="empty_notes">No notes yet</string>
     <string name="status_uploaded">Uploaded</string>
     <string name="status_failed">Failed</string>

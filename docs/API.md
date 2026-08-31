@@ -48,6 +48,34 @@ Form fields:
 
 ---
 
+## `GET /health/audio`
+
+Connection test used by the phone's Settings screen ("Test connection").
+Reachability and token validity in one side-effect-free probe.
+
+### Request
+
+```
+GET /health/audio
+Authorization: Bearer <token>
+```
+
+### Responses
+
+| Code | Meaning                                                              |
+|------|----------------------------------------------------------------------|
+| 200  | Server reachable and token valid.                                    |
+| 401  | Server reachable but token invalid/revoked.                          |
+| 404  | Endpoint not deployed — update the server before testing.            |
+
+### Client behavior
+
+- `200` → **Connected**.
+- `401` → **Unauthorized — check your bearer token**.
+- Anything else → the HTTP code is shown verbatim for debugging.
+
+---
+
 ## Authentication
 
 - HTTPS is recommended but **not enforced or validated** by the app. The phone
