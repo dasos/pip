@@ -61,7 +61,6 @@ android {
     }
 
     lint {
-        warning += "MissingApplicationIcon"
         warning += "NotificationIcon"
         // BIND_LISTENER is deprecated but deliberate: it's the low-latency
         // path WearCapabilityListenerService uses to receive audio assets.
@@ -93,5 +92,9 @@ dependencies {
 
     implementation(libs.work.runtime)
     implementation(libs.datastore.prefs)
+<<<<<<< HEAD
     implementation(libs.concurrent.futures)
 }
+=======
+}
+>>>>>>> e70b385 (Set Pip app icons)

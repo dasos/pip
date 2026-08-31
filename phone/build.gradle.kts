@@ -62,7 +62,6 @@ android {
     }
 
     lint {
-        warning += "MissingApplicationIcon"
         warning += "NotificationIcon"
         // BIND_LISTENER is deprecated but deliberate: it's the low-latency
         // path WearListenerService uses to receive audio assets from the watch.
