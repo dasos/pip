@@ -52,11 +52,13 @@ private enum class UiState {
     RESULT
 }
 
+private const val SEND_TIMEOUT_MS = 2000L
+private const val RESULT_DURATION_MS = 2000L
+
 @Composable
 fun RecordingScreen() {
     val context = LocalContext.current
     var uiState by remember { mutableStateOf(UiState.IDLE) }
-    var startedAt by remember { mutableLongStateOf(0L) }
     var tick by remember { mutableLongStateOf(0L) }
     var resultText by remember { mutableStateOf<String?>(null) }
 
@@ -64,7 +66,7 @@ fun RecordingScreen() {
         if (uiState == UiState.RECORDING) return
         val output = AudioQueueManager(context).newRecordingFile()
         RecordingService.postStart(context, output)
-        startedAt = System.currentTimeMillis()
+        tick = 0
         uiState = UiState.RECORDING
     }
 
@@ -79,7 +81,7 @@ fun RecordingScreen() {
         if (granted) startCapture() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    // Observe delivery status
+    // Observe delivery status; only meaningful while SENDING.
     LaunchedEffect(Unit) {
         RecordingService.statusFlow.collect { status ->
             if (status != null && uiState == UiState.SENDING) {
@@ -88,7 +90,27 @@ fun RecordingScreen() {
                     DeliveryStatus.Queued -> context.getString(R.string.status_queued)
                 }
                 uiState = UiState.RESULT
-                delay(2000)
+            }
+        }
+    }
+
+    // Guard: if no status arrives within SEND_TIMEOUT_MS, treat as queued so the
+    // circle never hangs on "Sending…" (clip is persisted locally either way).
+    LaunchedEffect(uiState) {
+        if (uiState == UiState.SENDING) {
+            delay(SEND_TIMEOUT_MS)
+            if (uiState == UiState.SENDING) {
+                resultText = context.getString(R.string.status_queued)
+                uiState = UiState.RESULT
+            }
+        }
+    }
+
+    // Show the result briefly, then return to idle.
+    LaunchedEffect(uiState) {
+        if (uiState == UiState.RESULT) {
+            delay(RESULT_DURATION_MS)
+            if (uiState == UiState.RESULT) {
                 resultText = null
                 uiState = UiState.IDLE
             }
@@ -111,7 +133,7 @@ fun RecordingScreen() {
     ) {
         RecordCircle(
             uiState = uiState,
-            startedAt = startedAt,
+            tick = tick,
             resultText = resultText,
             onPress = { requestOrStart() },
             onRelease = {
@@ -127,7 +149,7 @@ fun RecordingScreen() {
 @Composable
 private fun RecordCircle(
     uiState: UiState,
-    startedAt: Long,
+    tick: Long,
     resultText: String?,
     onPress: () -> Unit,
     onRelease: () -> Unit,
@@ -164,12 +186,15 @@ private fun RecordCircle(
         modifier = Modifier
             .size(140.dp)
             .then(scaleModifier)
-            .pointerInput(uiState) {
+            .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
                         onPress()
-                        val released = tryAwaitRelease()
-                        if (released) onRelease()
+                        // Suspends until finger up OR the gesture is cancelled;
+                        // either way the hold is over, so stop. Keyed on Unit so the
+                        // state change (IDLE -> RECORDING) doesn't cancel this mid-hold.
+                        tryAwaitRelease()
+                        onRelease()
                     }
                 )
             }
@@ -191,7 +216,7 @@ private fun RecordCircle(
                     )
                 }
                 UiState.RECORDING -> {
-                    val elapsed = System.currentTimeMillis() - startedAt
+                    val elapsed = tick * 500
                     val seconds = elapsed / 1000
                     val minutes = seconds / 60
                     val secs = seconds % 60
