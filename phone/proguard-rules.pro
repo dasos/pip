@@ -8,3 +8,6 @@
 
 # Room
 -keep class * extends androidx.room.RoomDatabase { *; }
+
+# Tink (security-crypto) — errorprone annotations are compile-time only
+-dontwarn com.google.errorprone.annotations.**

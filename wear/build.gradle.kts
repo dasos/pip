@@ -1,5 +1,10 @@
 import java.util.Properties
 
+val signingProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -8,6 +13,15 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        create("release") {
+            storeFile = file(signingProps.getProperty("storeFile", "${System.getProperty("user.home")}/.android/debug.keystore"))
+            storePassword = signingProps.getProperty("storePassword", "android")
+            keyAlias = signingProps.getProperty("keyAlias", "androiddebugkey")
+            keyPassword = signingProps.getProperty("keyPassword", "android")
+        }
+    }
+
     namespace = "com.pip.wear"
     compileSdk = 35
 
@@ -24,6 +38,7 @@ android {
             isMinifyEnabled = false
         }
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -48,6 +63,9 @@ android {
     lint {
         warning += "MissingApplicationIcon"
         warning += "NotificationIcon"
+        // BIND_LISTENER is deprecated but deliberate: it's the low-latency
+        // path WearCapabilityListenerService uses to receive audio assets.
+        disable += "WearableBindListener"
     }
 }
 
