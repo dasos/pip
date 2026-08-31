@@ -15,7 +15,7 @@ The server only ever stores text + a timestamp — never audio.
 
 ## Modules
 
-Both modules are Android apps (`com.pip.wear`, `com.pip.phone`). Current version: `0.1.0`.
+Both modules are Android apps (`com.pip.wear`, `com.pip.phone`). Current version: `0.2.0`.
 
 | Module | App ID          | minSdk | target/compileSdk |
 |--------|-----------------|--------|-------------------|
