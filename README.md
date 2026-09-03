@@ -16,7 +16,7 @@ inspect audio on either device.
 
 ## Modules
 
-Both Gradle modules build Android apps at version `0.2.2` (version code `4`).
+Both Gradle modules build Android apps at version `0.2.3` (version code `5`).
 They deliberately share the application ID and signing key so Wear OS Data
 Layer pairing works.
 

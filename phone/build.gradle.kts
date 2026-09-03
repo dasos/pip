@@ -5,6 +5,14 @@ val signingProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
+val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val isReleaseSigningConfigured = releaseSigningKeys.all { signingProps.getProperty(it)?.isNotBlank() == true }
+val isReleaseBuildRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+
+if (isReleaseBuildRequested && !isReleaseSigningConfigured) {
+    error("Release builds require keystore.properties with: ${releaseSigningKeys.joinToString()}")
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -14,13 +22,15 @@ plugins {
 }
 
 android {
-    signingConfigs {
-        create("release") {
-            storeFile = file(signingProps.getProperty("storeFile", "${System.getProperty("user.home")}/.android/debug.keystore"))
-            storePassword = signingProps.getProperty("storePassword", "android")
-            keyAlias = signingProps.getProperty("keyAlias", "androiddebugkey")
-            keyPassword = signingProps.getProperty("keyPassword", "android")
+    val releaseSigning = if (isReleaseSigningConfigured) {
+        signingConfigs.create("release") {
+            storeFile = rootProject.file(requireNotNull(signingProps.getProperty("storeFile")))
+            storePassword = requireNotNull(signingProps.getProperty("storePassword"))
+            keyAlias = requireNotNull(signingProps.getProperty("keyAlias"))
+            keyPassword = requireNotNull(signingProps.getProperty("keyPassword"))
         }
+    } else {
+        null
     }
 
     namespace = "com.pip.phone"
@@ -31,8 +41,8 @@ android {
         applicationId = "com.pip"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.2.2"
+        versionCode = 5
+        versionName = "0.2.3"
     }
 
     buildTypes {
@@ -40,7 +50,7 @@ android {
             isMinifyEnabled = false
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = releaseSigning
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
