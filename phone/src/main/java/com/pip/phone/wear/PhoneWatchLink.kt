@@ -12,11 +12,11 @@ object PhoneWatchLink {
     private val _watchConnected = MutableStateFlow(false)
     val watchConnected: StateFlow<Boolean> = _watchConnected.asStateFlow()
 
-    fun onWatchConnected() {
-        _watchConnected.value = true
-    }
+    fun onWatchConnected() = setWatchConnected(true)
 
-    fun onWatchDisconnected() {
-        _watchConnected.value = false
+    fun onWatchDisconnected() = setWatchConnected(false)
+
+    fun setWatchConnected(connected: Boolean) {
+        _watchConnected.value = connected
     }
 }

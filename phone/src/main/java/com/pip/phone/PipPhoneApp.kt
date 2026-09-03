@@ -7,6 +7,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.google.android.gms.wearable.Wearable
+import com.pip.phone.wear.PhoneWatchLink
 import com.pip.phone.worker.PhoneWorkerBuilder
 import com.pip.phone.worker.AudioUploadWorker
 import kotlinx.coroutines.CoroutineScope
@@ -23,14 +24,16 @@ class PipPhoneApp : Application() {
     }
 
     /**
-     * Makes a real Wear Data Layer call so Play Services registers this app as a
-     * recipient for events from the paired watch. Without this, GMS only knows the
-     * watch app (which always calls the API when it pushes recordings), and
-     * /pip/audio events never reach this app's WearListenerService.
+     * Registers this app as a Wear Data Layer recipient and seeds the connection
+     * state because peer callbacks only report changes after the listener binds.
      */
     private fun registerWithWearable() {
         CoroutineScope(Dispatchers.IO).launch {
-            runCatching { Wearable.getNodeClient(this@PipPhoneApp).connectedNodes.await() }
+            runCatching {
+                Wearable.getNodeClient(this@PipPhoneApp).connectedNodes.await()
+            }.onSuccess { nodes ->
+                PhoneWatchLink.setWatchConnected(nodes.isNotEmpty())
+            }
         }
     }
 

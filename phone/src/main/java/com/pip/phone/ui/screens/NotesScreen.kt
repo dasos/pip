@@ -115,27 +115,27 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
     }
 
     // Owns the MediaPlayer lifecycle for the selected file.
-    PlaybackPlayer(filePath = previewPath)
+    PlaybackPlayer(filePath = previewPath) { completedPath ->
+        if (previewPath == completedPath) previewPath = null
+    }
 }
 
 /** Creates/releases a [MediaPlayer] for [filePath]; null stops playback. */
 @Composable
-private fun PlaybackPlayer(filePath: String?) {
+private fun PlaybackPlayer(filePath: String?, onCompleted: (String) -> Unit) {
     DisposableEffect(filePath) {
-        val player = if (filePath != null) {
+        val player = filePath?.let { path ->
             MediaPlayer().apply {
-                setDataSource(File(filePath).absolutePath)
-                setOnCompletionListener { runCatching { stop() } }
+                setDataSource(File(path).absolutePath)
+                setOnCompletionListener { onCompleted(path) }
                 prepare()
                 start()
             }
-        } else {
-            null
         }
         onDispose {
-            if (player != null) {
-                runCatching { player.stop() }
-                player.release()
+            player?.let {
+                runCatching { it.stop() }
+                it.release()
             }
         }
     }
