@@ -57,9 +57,9 @@ private sealed interface TestResult {
 }
 
 private suspend fun testConnection(serverUrl: String, token: String): TestResult = withContext(Dispatchers.IO) {
-    // Ping the dedicated health endpoint: GET {base}/health/audio.
+    // Ping the dedicated health endpoint: GET {base}/api/health/audio.
     // Side-effect free, checks both reachability and token validity.
-    val url = (serverUrl.trim().trimEnd('/') + "/health/audio").toHttpUrlOrNull()
+    val url = (serverUrl.trim().trimEnd('/') + "/api/health/audio").toHttpUrlOrNull()
         ?: return@withContext TestResult.InvalidUrl
     val client = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)

@@ -1,95 +1,130 @@
 # Pip
 
-A Wear OS voice-capture app. The watch records a short audio clip via a press-and-hold
-gesture, sends it to the paired phone over the Wear OS Data Layer, the phone transcribes
-it **on-device** (ML Kit), and the resulting text is uploaded to a custom REST endpoint.
-The server only ever stores text + a timestamp — never audio.
+Pip is a Wear OS voice-capture app. Hold the record button on the watch to
+capture a short WAV clip. The watch sends the clip to its paired phone through
+the Wear OS Data Layer; the phone stores it locally and uploads the WAV
+**one-way** to a configured server. Pip does not transcribe or otherwise
+inspect audio on either device.
 
 ## Project layout
 
-| Path            | Description                                                        |
-|-----------------|--------------------------------------------------------------------|
-| `wear/`         | Wear OS app. Records WAV clips and syncs them to the phone.        |
-| `phone/`        | Companion phone app. Transcribes audio, uploads notes to the server, hosts settings UI. |
-| `docs/API.md`   | Server API contract and wire-format reference.                     |
+| Path | Description |
+|---|---|
+| `wear/` | Standalone Wear OS recorder: recording UI, foreground microphone service, tile, local delivery queue, and Data Layer sender. |
+| `phone/` | Companion app: receives WAV assets, maintains the recording list, plays retained audio, and uploads it to the server. |
+| `docs/API.md` | Server API contract, including upload and connection-test endpoints. |
 
 ## Modules
 
-Both modules are Android apps (`com.pip.wear`, `com.pip.phone`). Current version: `0.2.0`.
+Both Gradle modules build Android apps at version `0.2.2` (version code `4`).
+They deliberately share the application ID and signing key so Wear OS Data
+Layer pairing works.
 
-| Module | App ID          | minSdk | target/compileSdk |
-|--------|-----------------|--------|-------------------|
-| Wear   | `com.pip.wear`  | 30     | 35                |
-| Phone  | `com.pip.phone` | 26     | 35                |
+| Module | Namespace | Application ID | minSdk | target/compileSdk |
+|---|---|---|---:|---:|
+| Wear | `com.pip.wear` | `com.pip` | 30 | 35 |
+| Phone | `com.pip.phone` | `com.pip` | 26 | 35 |
 
 ## How it works
 
-```
-Watch ──(press-and-hold, record WAV)──► local queue (max 20, 7d)
-  │  Wear OS Data Layer (Asset)
+```text
+Watch ──(hold to record 16 kHz PCM WAV)──► local queue (max 20, 7 days)
+  │  Wear OS Data Layer Asset
   ▼
-Phone ──(ML Kit Transcriber, on-device)──► text
-  │  queue (max 20, 7d) if offline
+Phone ──(save WAV and enqueue upload)──► local list / upload worker
+  │  multipart POST /api/audio
   ▼
-Server ──POST /notes──► stored note
+Server ──► stores audio (and may transcribe it server-side)
 ```
 
-- **Watch**: records 16-bit PCM, mono, 16 kHz WAV via a press-and-hold button. Clips are
-  queued on the watch (max 20, 7-day retention) and delivered to the phone over the Wear
-  OS Data Layer using `Asset` transfer (`/pip/audio`). No configuration UI exists on the
-  watch; it receives config silently from the phone.
-- **Phone**: receives each clip, writes it to disk, inserts it into a Room-backed queue
-  (max 20, 7-day retention), transcribes it with ML Kit
-  `SpeechRecognition.Transcriber`, and uploads the resulting text with
-  `POST {server}/notes`. Uploads are retried with backoff; a `401` marks the note
-  `FAILED` (token revoked, no infinite retries). A periodic WorkManager job re-runs
-  uploads every 15 minutes while online.
-- **Server**: a third-party endpoint that accepts `{ "text": "...", "created_at": "<ISO-8601 UTC>" }`
-  with a `Authorization: Bearer <token>` header. See `docs/API.md` for the full contract.
+### Watch
+
+- The recording screen has a press-and-hold control and the app also provides a
+  Wear OS recording tile.
+- A foreground service owns microphone capture, so recording can continue when
+  the screen turns off. It requires the `RECORD_AUDIO` permission.
+- Recordings are 16 kHz, 16-bit, mono PCM WAV files.
+- The watch keeps undelivered recordings in a local queue capped at 20 files,
+  with 7-day retention. It tries to send a fresh recording immediately and a
+  WorkManager job retries queued recordings every 15 minutes.
+- Audio travels as a Wear OS Data Layer `Asset` on `/pip/audio/...` rather
+  than in a DataItem payload. Once the phone has saved the asset and enqueued
+  its upload, it acknowledges the recording so the watch can remove the local
+  queued copy.
+
+### Phone
+
+- The phone listens for Wear Data Layer audio assets, saves each WAV under its
+  app-private storage, creates a Room `notes` row, and immediately enqueues an
+  upload worker.
+- The recording list shows capture time and one of **Pending**, **Uploaded**,
+  or **Failed**. Retained recordings can be played in the phone app.
+- The database list is trimmed to its 20 newest rows. Audio files older than
+  seven days are removed during queue-policy enforcement; pending rows whose
+  files are gone are also removed.
+- A one-time upload worker runs on arrival. A network-constrained periodic
+  WorkManager job revisits pending uploads every 15 minutes.
+- Uploads use `multipart/form-data` to `POST {base}/api/audio`, sending the
+  WAV as `file` (`audio/wav`) and the watch capture time as `created_at` in
+  ISO-8601 UTC. The app sends `Authorization: Bearer <token>`.
+- Any successful 2xx response marks the item **Uploaded**. A 401 is terminal
+  and marks it **Failed**. Other HTTP failures and network failures stay
+  **Pending** and are retried.
 
 ## Setup
 
-1. **Phone app (first run)**: the app shows the Settings screen. Enter the server URL and
-   bearer token, then tap **Save**. Optionally tap **Test connection** first — note this
-   only does an HTTP `HEAD` to the base URL (not `/notes`) and treats any 2xx as success;
-   it does not validate the URL scheme or probe the API.
-2. Config is stored in **EncryptedSharedPreferences** (token is never hardcoded) and
-   mirrored to the watch over the Wear OS Data Layer (`/pip/config`) for forward-looking
-   use.
-3. Build and install the Wear app on the watch and the companion on the phone.
+1. Install the Wear app on the watch and the phone app on its paired phone.
+2. In the phone app, open **Settings**, enter the base server URL and bearer
+   token, and tap **Save**. Saving stores the values in encrypted preferences
+   and also sends them to the watch over the Data Layer. The watch currently
+   stores this configuration but does not use it for uploads.
+3. Tap **Test connection** to call `GET {base}/api/health/audio` with the
+   bearer token. A 2xx response is shown as connected; 401 and 403 are shown
+   as unauthorized; other HTTP and network errors are reported in the UI.
+4. Record on the watch by holding the record control, then release it to queue
+   and send the WAV.
 
-### HTTPS
+### Server URL and HTTPS
 
-HTTPS is **recommended but not enforced** by the app. The phone saves whatever scheme it's
-given and relies on the platform default (cleartext blocked for targetSdk 28+, here 35) to
-reject plain `http://`. An `http://` URL will be stored but simply fail to connect. See
-"Known risks" below and `docs/API.md`.
+The app parses the entered base URL when making a request but does not require
+or validate HTTPS before saving it. With the app targeting SDK 35, Android's
+default cleartext policy normally rejects `http://` connections unless the
+platform/network configuration permits them. Use HTTPS and a valid bearer token
+for production deployments.
 
 ## Building
 
+The project requires JDK 17 and the Android SDK.
+
 ```bash
-./gradlew :wear:assembleDebug   # build the Wear app
-./gradlew :phone:assembleDebug  # build the phone app
+./gradlew assembleDebug          # build both apps
+./gradlew :wear:assembleDebug    # build the Wear app
+./gradlew :phone:assembleDebug   # build the phone app
 ```
 
-Requires the Android SDK; set the location via `local.properties` (`sdk.dir=...`) or the
-`ANDROID_HOME` environment variable. `local.properties` is gitignored and not committed.
-
-## Known risks / to verify on-device
-
-- **ML Kit `SpeechRecognition.Transcriber` (beta)** transcribes a pre-recorded WAV file
-  directly. A ~100 MB language model downloads on first use, then offline after that.
-  Confirm model-download behavior and WAV acceptance on a real device.
-- **WAV format**: the watch records 16-bit PCM mono 16 kHz WAV, which the transcriber
-  requires. No conversion is performed on the phone.
-- **Wear OS Data Layer** is used with `Asset` transfer for audio; large or long clips
-  should be validated.
-- **Large/long clips** from the watch may strain the Data Layer; verify throughput on a
-  real device.
+Set the SDK location in gitignored `local.properties` (`sdk.dir=...`) or via
+`ANDROID_HOME`.
 
 ## Server contract
 
-The full server-side API contract is documented in [`docs/API.md`](docs/API.md), including
-request/response formats, auth, retry behavior, an optional future `/transcribe` endpoint,
-and configuration. An ML Kit fallback audio-based `/transcribe` endpoint is documented
-there as well but is **not** implemented in the client.
+The complete protocol is in [docs/API.md](docs/API.md). The app currently
+expects these endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/audio` | Receives one WAV file and its `created_at` timestamp. |
+| `GET /api/health/audio` | Side-effect-free connection and token check from Settings. |
+
+The server owns long-term audio storage and any optional transcription. It does
+not send a transcript or other content back to Pip.
+
+## Operational notes
+
+- Wear OS Data Layer Assets are intended for larger payloads than DataItems,
+  but recording length and real-device delivery throughput should still be
+  validated.
+- Audio is not a long-term local archive: phone-side file cleanup runs when
+  queue policies are enforced, and watch-side undelivered recordings expire
+  after seven days.
+- The phone's bearer token is stored with `EncryptedSharedPreferences`; do not
+  hardcode tokens or log them.

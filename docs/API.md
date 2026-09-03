@@ -8,14 +8,14 @@ phone never reads back a transcript or manages note content.
 
 ---
 
-## `POST /audio`
+## `POST /api/audio`
 
 Uploads a single recorded WAV file.
 
 ### Request
 
 ```
-POST /audio
+POST /api/audio
 Authorization: Bearer <token>
 Content-Type: multipart/form-data; boundary=...
 ```
@@ -48,7 +48,7 @@ Form fields:
 
 ---
 
-## `GET /health/audio`
+## `GET /api/health/audio`
 
 Connection test used by the phone's Settings screen ("Test connection").
 Reachability and token validity in one side-effect-free probe.
@@ -56,7 +56,7 @@ Reachability and token validity in one side-effect-free probe.
 ### Request
 
 ```
-GET /health/audio
+GET /api/health/audio
 Authorization: Bearer <token>
 ```
 
@@ -98,7 +98,7 @@ Watch ──(record WAV, press-and-hold)──► local queue (max 20, 7d)
 Phone ──(upload WAV over HTTP, retry queue)──► server
    │  queue (max 20, 7d) if offline
    ▼
-Server ──POST /audio──► stores audio (optionally transcribes)
+Server ──POST /api/audio──► stores audio (optionally transcribes)
 ```
 
 ---
