@@ -15,9 +15,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Card
+import androidx.compose.material3.PullToRefreshBox
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,6 +34,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -43,6 +49,9 @@ import com.pip.phone.data.NoteDao
 import com.pip.phone.data.NoteEntity
 import com.pip.phone.data.NoteStatus
 import com.pip.phone.data.PipDatabase
+import com.pip.phone.wear.requestWatchSync
+import com.pip.phone.worker.AudioUploadWorker
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -58,8 +67,9 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
         dao.observeAll().collect { value = it }
     }
 
-    // The audio file currently being previewed, or null when stopped.
+    val scope = rememberCoroutineScope()
     var previewPath by remember { mutableStateOf<String?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -73,27 +83,38 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
             )
         }
     ) { padding ->
-        if (notes.isEmpty()) {
-            Box(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(context.getString(R.string.empty_notes))
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(notes, key = { it.id }) { note ->
-                    NoteCard(
-                        note = note,
-                        isPlaying = previewPath != null && previewPath == note.audioPath,
-                        onTogglePlay = {
-                            previewPath = if (previewPath == note.audioPath) null else note.audioPath
-                        }
-                    )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                scope.launch {
+                    isRefreshing = true
+                    requestWatchSync(context)
+                    AudioUploadWorker.enqueue(context)
+                    isRefreshing = false
+                }
+            },
+            modifier = Modifier.padding(padding).fillMaxSize()
+        ) {
+            if (notes.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(context.getString(R.string.empty_notes))
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(notes, key = { it.id }) { note ->
+                        NoteCard(
+                            note = note,
+                            dao = dao,
+                            isPlaying = previewPath != null && previewPath == note.audioPath,
+                            onTogglePlay = {
+                                previewPath = if (previewPath == note.audioPath) null else note.audioPath
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -133,29 +154,56 @@ private fun rememberDao(): NoteDao {
 }
 
 @Composable
-private fun NoteCard(note: NoteEntity, isPlaying: Boolean, onTogglePlay: () -> Unit) {
+private fun NoteCard(note: NoteEntity, dao: NoteDao, isPlaying: Boolean, onTogglePlay: () -> Unit) {
     val context = LocalContext.current
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onTogglePlay) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                    contentDescription = context.getString(R.string.play_recording)
-                )
+    val scope = rememberCoroutineScope()
+    val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { false })
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            val direction = dismissState.dismissDirection
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = if (direction == SwipeToDismissBoxValue.StartToEnd) Arrangement.Start else Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = {
+                    scope.launch {
+                        if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                            note.audioPath?.let { File(it).delete() }
+                            dao.delete(note.id)
+                        } else {
+                            dao.update(note.copy(status = NoteStatus.PENDING))
+                            AudioUploadWorker.enqueue(context)
+                        }
+                    }
+                }) {
+                    Icon(
+                        imageVector = if (direction == SwipeToDismissBoxValue.StartToEnd) Icons.Filled.Delete else Icons.Filled.PlayArrow,
+                        contentDescription = context.getString(if (direction == SwipeToDismissBoxValue.StartToEnd) R.string.delete_note else R.string.upload_note)
+                    )
+                    Text(context.getString(if (direction == SwipeToDismissBoxValue.StartToEnd) R.string.delete_note else R.string.upload_note))
+                }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = formatTime(note.createdAt),
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.size(4.dp))
-                StatusBadge(note.status)
+        }
+    ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onTogglePlay) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                        contentDescription = context.getString(R.string.play_recording)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = formatTime(note.createdAt), fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.size(4.dp))
+                    StatusBadge(note.status)
+                }
             }
         }
     }

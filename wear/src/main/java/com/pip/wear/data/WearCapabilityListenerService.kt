@@ -1,5 +1,6 @@
 package com.pip.wear.data
 
+import android.app.Application
 import android.util.Log
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -26,6 +27,7 @@ class WearCapabilityListenerService : WearableListenerService() {
                 when {
                     path.startsWith(WearPaths.CONFIG_PATH) -> onConfig(dataMap)
                     path.startsWith(WearPaths.ACK_PATH) -> onAck(dataMap)
+                    path.startsWith(WearPaths.SYNC_REQUEST_PATH) -> onSyncRequest()
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed handling data on $path", t)
@@ -44,6 +46,12 @@ class WearCapabilityListenerService : WearableListenerService() {
     private fun onAck(dataMap: com.google.android.gms.wearable.DataMap) {
         val ids = dataMap.getStringArrayList(WearPaths.KEY_ACK_IDS) ?: return
         AudioQueueManager(applicationContext).clearSent(ids)
+    }
+
+    private fun onSyncRequest() {
+        scope.launch {
+            WearSendClient(application as Application).pushQueued(AudioQueueManager(applicationContext))
+        }
     }
 
     override fun onDestroy() {
