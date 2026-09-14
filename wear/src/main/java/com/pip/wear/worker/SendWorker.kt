@@ -16,20 +16,25 @@ class SendWorker(context: Context, params: WorkerParameters) :
     override suspend fun doWork(): Result {
         val app = applicationContext as Application
         val queue = AudioQueueManager(app)
-        if (queue.list().isEmpty()) return Result.success()
+        val items = queue.list()
+        android.util.Log.d(TAG, "SendWorker doWork: ${items.size} queued item(s)")
+        if (items.isEmpty()) return Result.success()
 
         val client = WearSendClient(app)
         if (!client.phoneReachable()) {
+            android.util.Log.d(TAG, "SendWorker: Phone unreachable, will retry")
             return Result.retry() // Bluetooth not connected; try again next period.
         }
 
         return try {
             val result = client.pushQueued(queue)
+            android.util.Log.i(TAG, "SendWorker: pushQueued completed with result $result")
             when (result) {
                 WearSendClient.SendResult.SENT -> Result.success()
                 else -> Result.retry()
             }
         } catch (t: Throwable) {
+            android.util.Log.w(TAG, "SendWorker failed", t)
             Result.retry()
         }
     }

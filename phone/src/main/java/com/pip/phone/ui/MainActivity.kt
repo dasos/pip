@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettings) {
                     SettingsScreen(
-                        onSaved = { showSettings = false }
+                        onClose = { showSettings = false }
                     )
                 } else {
                     NotesScreen(

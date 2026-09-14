@@ -24,10 +24,11 @@
 
         <service
             android:name=".wear.WearListenerService"
-            android:exported="false"
-            tools:ignore="Instantiatable">
+            android:exported="true"
+            tools:ignore="Instantiatable,ExportedService">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
             </intent-filter>
         </service>
 
