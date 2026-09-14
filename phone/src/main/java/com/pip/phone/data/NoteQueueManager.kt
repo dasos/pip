@@ -6,8 +6,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Phone-side queue policies: at most [MAX_ITEMS] notes retained and audio older
- * than [RETENTION_DAYS] is evicted. Oldest items are deleted first.
+ * Phone-side queue policies: at most [MAX_ITEMS] notes retained and uploaded audio
+ * older than [RETENTION_DAYS] is evicted. Pending items are preserved.
  */
 class NoteQueueManager(private val context: Context) {
 
@@ -22,13 +22,15 @@ class NoteQueueManager(private val context: Context) {
     suspend fun enforcePolicies(dao: NoteDao) = withContext(Dispatchers.IO) {
         // Trim to capacity (newest retained).
         dao.trimTo(MAX_ITEMS)
-        // Evict audio files older than retention.
         val cutoff = System.currentTimeMillis() - RETENTION_DAYS * DAY_MS
         audioDir.listFiles().orEmpty()
             .filter { it.lastModified() < cutoff }
-            .forEach { it.delete() }
-        // Drop notes whose audio is gone and never uploaded (abandoned).
-        dao.byStatus(NoteStatus.PENDING).forEach { note ->
+            .forEach { file ->
+                if (dao.byStatus(NoteStatus.UPLOADED).any { it.audioPath == file.absolutePath }) {
+                    file.delete()
+                }
+            }
+        dao.byStatus(NoteStatus.UPLOADED).forEach { note ->
             val path = note.audioPath
             if (path != null && !File(path).exists()) {
                 dao.delete(note.id)

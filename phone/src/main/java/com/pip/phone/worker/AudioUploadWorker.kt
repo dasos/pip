@@ -29,8 +29,6 @@ class AudioUploadWorker(context: Context, params: WorkerParameters) :
         for (note in dao.byStatus(NoteStatus.PENDING)) {
             val file = note.audioPath?.let { File(it) } ?: continue
             if (!file.exists()) {
-                // Audio file was evicted; nothing left to upload.
-                dao.delete(note.id)
                 continue
             }
             when (uploader.upload(file, note.createdAt)) {

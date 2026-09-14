@@ -149,11 +149,16 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
 private fun PlaybackPlayer(filePath: String?, onCompleted: (String) -> Unit) {
     DisposableEffect(filePath) {
         val player = filePath?.let { path ->
-            MediaPlayer().apply {
-                setDataSource(File(path).absolutePath)
-                setOnCompletionListener { onCompleted(path) }
-                prepare()
-                start()
+            runCatching {
+                MediaPlayer().apply {
+                    setDataSource(File(path).absolutePath)
+                    setOnCompletionListener { onCompleted(path) }
+                    prepare()
+                    start()
+                }
+            }.getOrElse {
+                onCompleted(path)
+                null
             }
         }
         onDispose {

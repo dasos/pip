@@ -67,8 +67,9 @@ in sync when changed.
 
 - Wear Data Layer **Assets** are how large files travel (DataItems are capped
   at ~100 KB). 16 kHz mono is ~1.9 MB/min — keep clips short.
-- The phone retains audio files for **7 days** for playback, then evicts the
-  row + file. Do not use the WAV path as long-term storage.
+- The phone retains **uploaded** audio files for **7 days** for playback, then
+  evicts the row + file. Pending recordings are preserved. Do not use the WAV
+  path as long-term storage.
 - Secrets (server token) live only in `ServerConfig`
   (EncryptedSharedPreferences) — never plain prefs, never logs, never in an APK.
 - Room uses `fallbackToDestructiveMigration()` — add real `Migration`s and
