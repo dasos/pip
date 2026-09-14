@@ -14,12 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Card
-import androidx.compose.material3.PullToRefreshBox
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -70,9 +71,18 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
         dao.observeAll().collect { value = it }
     }
 
-    val scope = rememberCoroutineScope()
     var previewPath by remember { mutableStateOf<String?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun refresh() = scope.launch {
+        isRefreshing = true
+        try {
+            requestWatchSync(context)
+            AudioUploadWorker.enqueue(context)
+        } finally {
+            isRefreshing = false
+        }
+    }
 
     val watchConnected by PhoneWatchLink.watchConnected.collectAsState()
 
@@ -88,17 +98,23 @@ fun NotesScreen(onOpenSettings: () -> Unit) {
             )
         }
     ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                scope.launch {
-                    isRefreshing = true
-                    requestWatchSync(context)
-                    AudioUploadWorker.enqueue(context)
-                    isRefreshing = false
+        Box(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .pointerInput(isRefreshing) {
+                    var dragDistance = 0f
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { _, dragAmount ->
+                            if (dragAmount > 0f) dragDistance += dragAmount
+                        },
+                        onDragEnd = {
+                            if (!isRefreshing && dragDistance >= 120f) refresh()
+                            dragDistance = 0f
+                        },
+                        onDragCancel = { dragDistance = 0f }
+                    )
                 }
-            },
-            modifier = Modifier.padding(padding).fillMaxSize()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (!watchConnected) {

@@ -42,7 +42,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 6
-        versionName = "0.2.4"
+        versionName = "0.2.5"
     }
 
     buildTypes {
@@ -91,6 +91,7 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.foundation)
+    implementation(libs.compose.material)
     implementation(libs.compose.material3)
     implementation(libs.material.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
