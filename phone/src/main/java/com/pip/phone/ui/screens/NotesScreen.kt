@@ -1,29 +1,39 @@
 package com.pip.phone.ui.screens
 
 import android.media.MediaPlayer
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.splineBasedDecay
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Card
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,9 +53,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.pip.phone.R
 import com.pip.phone.data.NoteDao
@@ -60,6 +74,7 @@ import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -192,41 +207,71 @@ private fun rememberDao(): NoteDao {
     return remember { PipDatabase.get(context).noteDao() }
 }
 
+private enum class RevealValue { Closed, EndOpen, StartOpen }
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NoteCard(note: NoteEntity, dao: NoteDao, isPlaying: Boolean, onTogglePlay: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { false })
-    SwipeToDismissBox(
-        state = dismissState,
-        backgroundContent = {
-            val direction = dismissState.dismissDirection
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = if (direction == SwipeToDismissBoxValue.StartToEnd) Arrangement.Start else Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = {
+    val actionWidth = 88.dp
+    val density = LocalDensity.current
+    val actionWidthPx = with(density) { actionWidth.toPx() }
+    val reveal = remember {
+        AnchoredDraggableState(
+            initialValue = RevealValue.Closed,
+            anchors = DraggableAnchors {
+                RevealValue.Closed at 0f
+                RevealValue.EndOpen at -actionWidthPx
+                RevealValue.StartOpen at actionWidthPx
+            },
+            positionalThreshold = { distance -> distance * 0.5f },
+            velocityThreshold = { with(density) { 140.dp.toPx() } },
+            snapAnimationSpec = spring(stiffness = Spring.StiffnessMedium),
+            decayAnimationSpec = splineBasedDecay(density)
+        )
+    }
+    val offset = reveal.offset
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // Actions behind the card: upload on the left, delete on the right.
+        Row(modifier = Modifier.fillMaxSize()) {
+            RevealAction(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                icon = Icons.Filled.PlayArrow,
+                label = context.getString(R.string.upload_note),
+                onClick = {
                     scope.launch {
-                        if (direction == SwipeToDismissBoxValue.StartToEnd) {
-                            note.audioPath?.let { File(it).delete() }
-                            dao.delete(note.id)
-                        } else {
-                            dao.update(note.copy(status = NoteStatus.PENDING))
-                            AudioUploadWorker.enqueue(context)
-                        }
+                        dao.update(note.copy(status = NoteStatus.PENDING))
+                        AudioUploadWorker.enqueue(context)
+                        reveal.animateTo(RevealValue.Closed)
                     }
-                }) {
-                    Icon(
-                        imageVector = if (direction == SwipeToDismissBoxValue.StartToEnd) Icons.Filled.Delete else Icons.Filled.PlayArrow,
-                        contentDescription = context.getString(if (direction == SwipeToDismissBoxValue.StartToEnd) R.string.delete_note else R.string.upload_note)
-                    )
-                    Text(context.getString(if (direction == SwipeToDismissBoxValue.StartToEnd) R.string.delete_note else R.string.upload_note))
-                }
-            }
+                },
+                modifier = Modifier.width(actionWidth).fillMaxHeight()
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            RevealAction(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                icon = Icons.Filled.Delete,
+                label = context.getString(R.string.delete_note),
+                onClick = {
+                    scope.launch {
+                        note.audioPath?.let { File(it).delete() }
+                        dao.delete(note.id)
+                    }
+                },
+                modifier = Modifier.width(actionWidth).fillMaxHeight()
+            )
         }
-    ) {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(offset.roundToInt(), 0) }
+                .anchoredDraggable(reveal, Orientation.Horizontal)
+                .clickable { scope.launch { reveal.animateTo(RevealValue.Closed) } }
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -244,6 +289,29 @@ private fun NoteCard(note: NoteEntity, dao: NoteDao, isPlaying: Boolean, onToggl
                     StatusBadge(note.status)
                 }
             }
+        }
+    }
+}
+
+/** Full-height, fixed-width action revealed behind the card when dragged. */
+@Composable
+private fun RevealAction(
+    containerColor: Color,
+    contentColor: Color,
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .background(containerColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(imageVector = icon, contentDescription = label, tint = contentColor)
+            Text(text = label, color = contentColor, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
