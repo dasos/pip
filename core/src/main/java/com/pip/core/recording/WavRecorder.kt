@@ -1,4 +1,4 @@
-package com.pip.wear.recording
+package com.pip.core.recording
 
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -17,9 +17,11 @@ import java.time.Instant
 
 /**
  * Records microphone input to a 16-bit PCM mono 16 kHz WAV file — the format
- * required by the phone's ML Kit Transcriber.
+ * the server's Whisper pipeline consumes natively (see docs/API.md). Shared by
+ * the watch (primary recorder) and the phone (hold-to-record button), so this
+ * is the single place a format change lands.
  */
-class WavRecorder(private val outputFile: File) : Closeable {
+class WavRecorder(val outputFile: File) : Closeable {
 
     private var audioRecord: AudioRecord? = null
     private var stream: BufferedOutputStream? = null
@@ -79,8 +81,6 @@ class WavRecorder(private val outputFile: File) : Closeable {
         }
         return true
     }
-
-    fun elapsedMillis(): Long = System.currentTimeMillis() - startTime.toEpochMilli()
 
     override fun close() {
         job?.cancel()

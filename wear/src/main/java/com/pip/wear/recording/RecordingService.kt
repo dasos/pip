@@ -15,6 +15,7 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.pip.core.recording.WavRecorder
 import com.pip.wear.R
 import com.pip.wear.audio.AudioQueueManager
 import com.pip.wear.data.WearSendClient

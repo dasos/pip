@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "pip"
 include(":wear")
 include(":phone")
+include(":core")
